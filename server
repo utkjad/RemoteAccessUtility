@@ -6,8 +6,6 @@ import socket
 from thread import *
 from collections import defaultdict
 import subprocess as sp
-from urllib2 import urlopen
-
 
 class Server(object):
 	""" Class representing server
@@ -45,7 +43,7 @@ class Server(object):
 			print self.users
 			# Load server
 			self.sock = self.__load_server()
-			my_ip = json.load(urlopen('http://httpbin.org/ip'))['origin']
+			# my_ip = json.load(urlopen('http://httpbin.org/ip'))['origin']
 			self.host = "0.0.0.0"
 
 			# Bind given socket sock to a port 8080
