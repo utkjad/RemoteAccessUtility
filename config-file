@@ -2,7 +2,7 @@
 
 {"username": "Mangesh", "password":"1010", "allowed_programs":["ls"]},
 
-{"username": "Utk", "password":"1010", "allowed_programs": ["ls"]}
+{"username": "Utk", "password":"1010", "allowed_programs": ["ls","pwd"]}
 
 ]
 

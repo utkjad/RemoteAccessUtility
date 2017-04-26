@@ -37,7 +37,7 @@ Note - tested on localhost only. Did not test on remote devices. Should work wit
  example 
  ./client --server 127.0.0.1 --user Mangesh --password 1010 --exec 'ls -l'
 
-Note - the exec param should be in string.
+Note - the exec param should be in single quotes.
 
 
 
