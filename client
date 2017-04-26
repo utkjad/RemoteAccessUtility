@@ -1,0 +1,89 @@
+#!/usr/bin/env python 
+import argparse as ap
+import sys
+import socket
+import json
+
+class Client(object):
+	""" Represents a single client for REA
+		
+	Variables - 
+		server - localhost by default
+		uname - Username
+		passwd - User Password
+		cmd - Command User wants to execute on server
+
+		request - Sending request in JSON format
+			example - {"username": uname, "password": passwd, "cmd" : cmd}
+		port_number - hard coded default value of 8080
+		sock - socket communication obj
+	
+	Methods -
+
+	"""
+	def __init__(self, opts):
+		self.server, self.uname = ''.join(opts.server), ''.join(opts.user)
+		self.passwd, self.cmd  = ''.join(opts.password), ' '.join(opts.exec_cmd)
+		self.request = self.__request_json(self.uname, self.passwd, self.cmd)
+
+		# Default port 8080
+		self.port_number = 8080
+
+		try:
+			self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+		except Exception as e:
+			print "===> Cannot create socket!"
+			print e
+			sys.exit()
+
+	def get_send_data_to_server(self):
+		""" Sends data to the server and gets back the response
+		"""
+		try:
+			self.sock.sendall(self.request)
+			response = self.sock.recv(2048 * 10) #TODO
+			print response
+			self.sock.close()
+		except Exception as e:
+			print "===> Cannot Communicate with the server send/receive"
+			print e
+			sys.exit()
+
+
+	def connect_to_server(self):
+		""" Connects to the server, throws exception if not properly done.
+		"""
+		try:
+			print "server connected"
+			self.sock.connect((self.server, self.port_number))
+		except Exception as e:
+			print "===> Cannot connect to the server"
+			print e
+			sys.exit()
+
+	def __request_json(self, uname, passwd, cmd):
+		""" Makes request in the desired format for the server
+		"""
+		request = {"username": uname, "password": passwd, "cmd" : cmd}
+		return json.dumps(request)
+
+def entry(opts): #TODO - keep it in the __init__ package
+	c = Client(opts)
+	c.connect_to_server()
+	c.get_send_data_to_server()
+
+if __name__ == '__main__':
+	# ./client --server server --user username --password password --exec program to execute
+	a = ap.ArgumentParser()
+	a.add_argument('--server', nargs = 1)
+	a.add_argument('--user', nargs = 1)
+	a.add_argument('--password', nargs = 1)
+	a.add_argument('--exec', dest = 'exec_cmd', nargs = '*')
+
+	opts = a.parse_args(sys.argv[1:])
+
+	if not all([opts.server, opts.user, opts.password, opts.exec_cmd]):
+		a.print_usage()
+		sys.exit()
+	else:
+		entry(opts)

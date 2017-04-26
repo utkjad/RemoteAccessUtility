@@ -1,0 +1,227 @@
+#!/usr/bin/env python 
+
+import json
+import sys
+import socket
+from thread import *
+from collections import defaultdict
+import subprocess as sp
+from urllib2 import urlopen
+
+
+class Server(object):
+	""" Class representing server
+	Variables -
+		* users - dictionary keeping track of valid users
+		from config-file
+		exmaple -
+		{
+			<username>: {
+		 				"passwd" :XXX,
+		 				"prgms" : [XXX, XXX, XXX]
+		            },
+		 ....
+		 }
+		sock - Socket communication obj
+		host 
+		port_number
+		max_client - hardcoded 5 backlog
+	"""
+	def __init__(self, config_file_path):
+		try:
+			fp = open(config_file_path, 'r')
+			# List of available users
+			users_json_obj = json.load(fp)
+			# convert list of users to proper DS.
+			# {
+			#	<username>: {
+			# 				"passwd" :XXX,
+			# 				"prgms" : [XXX, XXX, XXX]
+			#            },
+			# ....
+			# }
+			self.users = defaultdict(dict)
+			self.__user_ds(users_json_obj)
+			print self.users
+			# Load server
+			self.sock = self.__load_server()
+			my_ip = json.load(urlopen('http://httpbin.org/ip'))['origin']
+			self.host = "0.0.0.0"
+
+			# Bind given socket sock to a port 8080
+			self.port_number = 8080
+			self.__bind_socket()
+
+			# limit total number of clients on the server
+			self.max_client = 5
+		except Exception as e:
+			print e
+			sys.exit()
+
+	def is_valid_user(self, uname, passwd):
+		""" Checks if user is indeed a valid user from config-file
+		Given:
+			uname - str - Username
+			passwd - str - password
+
+		Returns:
+			True if uname and password matches with config-file
+			else False 
+		"""
+		ret = True
+		if uname not in self.users.keys():
+			return False
+		else:
+			if passwd != self.users[uname]['passwd']:
+				return False
+		# uname and passwd matches
+		return ret
+
+	def can_execute(self, uname, cmd):
+		""" Checks if the user can execute the command
+
+		Given:
+			uname - str - Username
+			cmd - str - the actual command without paramters
+			exmaple - ls, pwd, grep etc
+
+		Returns:
+			True if the user is allowed to execute the command
+			False otherwise
+		"""
+		ret = True
+		if cmd not in self.users[uname]['prgms']:
+			return False
+		return ret
+
+	def handle_client(self, client):
+		try:
+			msg = client.recv(2048) #TODO
+			print msg
+			# client will send JSON. msg is JSON String not Object
+			request_json = json.loads(msg)
+			# request will be 
+			# {"username": XYZ, "password":XYZ, "cmd": XYZ}
+			uname = request_json["username"]
+			passwd = request_json["password"]
+			cmd = request_json["cmd"]
+			response = self.execute_user_command(uname, passwd, cmd)
+			print "*************START*************"
+			print uname + " " + executed + cmd
+			print "Response was "
+			print response
+			print "*************END***************"
+			client.sendall(response)
+			# NOTE - Not creating a session
+			client.close()
+		except Exception as e:
+			print e
+			return None
+
+	def execute_user_command(self, uname, passwd, cmd):
+		"""
+		Given:
+			uname
+			passwd
+			cmd : String example - ls -l
+
+		Returns:
+			output: String with actual output of the command if 
+			executed successfully else
+			Error Status-
+
+		"""
+		ret = None
+		if self.is_valid_user(uname, passwd):
+			print "is user validated?"
+			try:
+				tmp_cmd = cmd.split() # TODO catch exceptions/errors
+				if self.can_execute(uname, tmp_cmd[0]):
+					ret = sp.check_output(tmp_cmd)
+					return ret
+				else:
+					ret = "Unauthorised!"
+					return ret
+			except Exception as e:
+				ret = "invalid command"
+				return ret
+		else:
+			ret = "Invalid User!!"
+			return ret
+
+	def __user_ds(self, users):
+		""" Takes input from JSON and converts the data structure in
+		suitable format
+
+		From:
+		[{"username": "phoeby",
+			"password":"1010",
+			"allowed_programs":["ls","pwd"]
+			}, ...]
+
+		To:
+		{{""}}
+		"""
+		for user in users:
+			tmp_usr = str(user["username"])
+			tmp_passwd = str(user["password"])
+			tmp_al_prg = [str(i) for i in user["allowed_programs"]]
+
+			self.users[tmp_usr]["passwd"] = tmp_passwd
+			self.users[tmp_usr]["prgms"] = tmp_al_prg
+
+
+	def start_server(self):
+		""" Starts listening on the given port
+		"""
+		self.sock.listen(self.max_client)
+		print "SERVER LISTENING AT " + str(self.host)
+		print "Press Ctrl-c to quit"
+		# Start accepting clients
+		try:
+			while True:
+				client, client_addr = self.sock.accept()
+				print "Connected to "+ client_addr[0] + ":" + str(client_addr[1])
+				# Start new thread for each client
+				start_new_thread(self.handle_client, (client,))
+		# Stop server when user presses Ctrl-c
+		except KeyboardInterrupt:
+			print "\nTerminating server.."
+			print "Bye! :("
+			# Close socket to terminate connection
+			self.close_server()
+
+	def close_server(self):
+		self.sock.close()
+
+	def __bind_socket(self):
+		# host = "127.0.0.1"
+		try:
+			self.sock.bind((self.host, self.port_number))
+		except socket.error, msg:
+			print "Error binding socket to given host: "+str(msg)
+			sys.exit()
+
+	def __load_server(self):
+		try:
+			sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+		except socket.error, msg:
+			print "Error creating socket: " + str(msg)
+			sys.exit()
+
+		# Helpful for releasing port after exit
+		sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+		return sock
+
+
+def entry_point(config_file_path):
+	cur_server = Server(config_file_path = config_file_path)
+	cur_server.start_server()
+
+if __name__ == '__main__':
+	cmd_args = sys.argv
+	if len(cmd_args) != 2:
+		print ("Invalid arguments")
+		sys.exit()
+	else:
+		entry_point(cmd_args[1])
