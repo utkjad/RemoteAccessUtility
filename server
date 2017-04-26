@@ -105,7 +105,7 @@ class Server(object):
 			cmd = request_json["cmd"]
 			response = self.execute_user_command(uname, passwd, cmd)
 			print "*************START*************"
-			print uname + " " + executed + cmd
+			print uname + "  executed " + cmd
 			print "Response was "
 			print response
 			print "*************END***************"
